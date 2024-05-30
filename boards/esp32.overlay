@@ -1,0 +1,9 @@
+/ {
+    aliases {
+        led0 = &led0_node;
+    };
+};
+
+&led0_node {
+    gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; 
+};
