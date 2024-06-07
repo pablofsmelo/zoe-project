@@ -2,9 +2,25 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-#set(DTC_OVERLAY_FILE ${CMAKE_SOURCE_DIR}/boards/esp32.overlay)
-
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+include_directories(${ZEPHYR_BASE}/include)
+
 project(zoe-project)
 
-target_sources(app PRIVATE src/main.c)
+include_directories(${CMAKE_SOURCE_DIR}/components/open62541/include)
+
+add_subdirectory(components/open62541)
+
+target_sources(app PRIVATE
+    src/main.c
+)
+
+target_link_libraries(app PRIVATE open62541)
+
+# Configurar o compilador C++ para o bootloader
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fexceptions -fno-rtti")
+
+
+
+
