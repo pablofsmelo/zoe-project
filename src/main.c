@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <open62541/server.h>
 
 static const struct device *gpio_ct_dev = 
     DEVICE_DT_GET(DT_NODELABEL(gpio0));
