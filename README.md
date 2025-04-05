@@ -37,7 +37,7 @@ cd zoe-project
 ./install_open62541.sh
 
 # Build the project for your ESP32 board
-west build -b esp32s3_devkitc src
+west build -b esp32 -- -DDTC_OVERLAY_FILE=boards/esp32.overlay
 
 # Flash the binary to the ESP32 board
 west flash
