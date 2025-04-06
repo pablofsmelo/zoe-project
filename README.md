@@ -14,13 +14,28 @@ The project provides a working reference for implementing **industrial-grade com
 
 ---
 
+## 📦 Zephyr Installation (Required)
+
+Before building the ZOE Project, you need to install and configure **Zephyr RTOS** with ESP32 support.
+
+Follow the official Zephyr documentation for ESP32 setup:
+👉 [https://docs.zephyrproject.org/latest/boards/xtensa/esp32/doc/index.html](https://docs.zephyrproject.org/latest/boards/xtensa/esp32/doc/index.html)
+
+Make sure to:
+- Install the **Zephyr SDK**
+- Install **West** (Zephyr's meta-tool)
+- Initialize and update Zephyr's repositories
+- Export the environment with `zephyr-env.sh` or equivalent
+
+Once Zephyr is working correctly with ESP32, proceed with the steps below.
+
 ---
 
 ## 🚀 Getting Started
 
 ### ✅ Prerequisites
 
-- Zephyr SDK and West installed
+- Zephyr SDK and West installed and configured for ESP32
 - ESP-IDF setup (if needed for low-level ESP32 features)
 - Git with submodule support
 - Python 3, CMake, Ninja build system
@@ -30,7 +45,7 @@ The project provides a working reference for implementing **industrial-grade com
 
 ```bash
 # Clone the repository with submodules
-git clone https://github.com/your-username/zoe-project.git
+git clone --recurse-submodules https://github.com/your-username/zoe-project.git
 cd zoe-project
 
 # Run the install script to set up open62541
