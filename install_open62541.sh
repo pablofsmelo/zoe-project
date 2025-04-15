@@ -1,40 +1,40 @@
 #!/bin/bash
 
-# Criar diretório libs se não existir
+# Create the libs directory if it doesn't exist
 mkdir -p libs
 cd libs || exit 1
 
-# Clonar o repositório open62541
-echo "Clonando open62541..."
+# Clone the open62541 repository
+echo "Cloning open62541..."
 git clone https://github.com/open62541/open62541.git || {
-  echo "Erro ao clonar open62541."
+  echo "Failed to clone open62541."
   exit 1
 }
 
-# Entrar no diretório do open62541
+# Enter the open62541 directory
 cd open62541 || exit 1
 
-# Atualizar submódulos
-echo "Atualizando submódulos..."
+# Update submodules
+echo "Updating submodules..."
 git submodule update --init --recursive || {
-  echo "Erro ao atualizar submódulos."
+  echo "Failed to update submodules."
   exit 1
 }
 
-# Criar diretório de build e compilar
+# Create the build directory and compile
 mkdir -p build
 cd build || exit 1
 
-echo "Configurando CMake..."
+echo "Configuring CMake..."
 cmake .. || {
-  echo "Erro ao configurar o CMake."
+  echo "Failed to configure CMake."
   exit 1
 }
 
-echo "Compilando open62541..."
+echo "Compiling open62541..."
 make -j$(nproc) || {
-  echo "Erro ao compilar open62541."
+  echo "Failed to compile open62541."
   exit 1
 }
 
-echo "Instalação concluída! open62541 está em libs/open62541"
+echo "Installation complete! open62541 is located in libs/open62541"
