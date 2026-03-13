@@ -1,6 +1,6 @@
 /* THIS IS A SINGLE-FILE DISTRIBUTION CONCATENATED FROM THE OPEN62541 SOURCES
  * visit http://open62541.org/ for information about this software
- * Git-Revision: v1.5.0-86-g4f887b8fd
+ * Git-Revision: v1.5.3-dirty
  */
 
 /*
@@ -18,7 +18,7 @@
 #ifndef OPEN62541_H_
 #define OPEN62541_H_
 
-/**** amalgamated original file "/src_generated/open62541/config.h" ****/
+/**** amalgamated original file "/build/src_generated/open62541/config.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,10 +30,10 @@
  * ----------------- */
 #define UA_OPEN62541_VER_MAJOR 1
 #define UA_OPEN62541_VER_MINOR 5
-#define UA_OPEN62541_VER_PATCH 0
-#define UA_OPEN62541_VER_LABEL "-86-g4f887b8fd" /* Release candidate label, etc. */
-#define UA_OPEN62541_VER_COMMIT "v1.5.0-86-g4f887b8fd"
-#define UA_OPEN62541_VERSION "v1.5.0-86-g4f887b8fd"
+#define UA_OPEN62541_VER_PATCH 3
+#define UA_OPEN62541_VER_LABEL "-dirty" /* Release candidate label, etc. */
+#define UA_OPEN62541_VER_COMMIT "v1.5.3-dirty"
+#define UA_OPEN62541_VERSION "v1.5.3-dirty"
 
 /**
  * Architecture
@@ -41,10 +41,16 @@
  * Define one of the following. */
 
 /* #undef UA_ARCHITECTURE_WIN32 */
-#define UA_ARCHITECTURE_POSIX
-/* #undef UA_ARCHITECTURE_ZEPHYR */
+/* #undef UA_ARCHITECTURE_POSIX */
+#define UA_ARCHITECTURE_ZEPHYR
 /* #undef UA_ARCHITECTURE_LWIP */
 /* #undef UA_ARCHITECTURE_FREERTOS */
+
+#ifdef UA_ARCHITECTURE_ZEPHYR
+#include <zephyr/kernel.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/socket_select.h>
+#endif
 
 /* Select default architecture if none is selected */
 #if !defined(UA_ARCHITECTURE_WIN32) && !defined(UA_ARCHITECTURE_POSIX) &&      \
@@ -70,19 +76,19 @@
 #define UA_ENABLE_SUBSCRIPTIONS
 #define UA_ENABLE_PUBSUB
 /* #undef UA_ENABLE_PUBSUB_FILE_CONFIG */
-/* #undef UA_ENABLE_PUBSUB_INFORMATIONMODEL */
+#define UA_ENABLE_PUBSUB_INFORMATIONMODEL
 #define UA_ENABLE_DA
 #define UA_ENABLE_DIAGNOSTICS
 #define UA_ENABLE_HISTORIZING
 #define UA_ENABLE_SUBSCRIPTIONS_EVENTS
 #define UA_ENABLE_JSON_ENCODING
+/* #undef UA_ENABLE_JSON_ENCODING_LEGACY */
 #define UA_ENABLE_XML_ENCODING
 /* #undef UA_ENABLE_MQTT */
 /* #undef UA_ENABLE_NODESET_INJECTOR */
 /* #undef UA_INFORMATION_MODEL_AUTOLOAD */
 /* #undef UA_ENABLE_ENCRYPTION_MBEDTLS */
 /* #undef UA_ENABLE_GDS_PUSHMANAGEMENT */
-/* #undef UA_ENABLE_RBAC */
 /* #undef UA_ENABLE_TPM2_SECURITY */
 /* #undef UA_ENABLE_ENCRYPTION_OPENSSL */
 /* #undef UA_ENABLE_ENCRYPTION_LIBRESSL */
@@ -100,7 +106,7 @@
 /* #undef UA_ENABLE_INLINABLE_EXPORT */
 #define UA_ENABLE_NODESET_COMPILER_DESCRIPTIONS
 /* #undef UA_ENABLE_DETERMINISTIC_RNG */
-/* #undef UA_ENABLE_DISCOVERY */
+#define UA_ENABLE_DISCOVERY
 /* #undef UA_ENABLE_DISCOVERY_MULTICAST_MDNSD */
 /* #undef UA_ENABLE_DISCOVERY_MULTICAST_AVAHI */
 #if defined(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD) || defined(UA_ENABLE_DISCOVERY_MULTICAST_AVAHI)
@@ -109,12 +115,12 @@
 /* #undef UA_ENABLE_QUERY */
 /* #undef UA_ENABLE_MALLOC_SINGLETON */
 #define UA_ENABLE_DISCOVERY_SEMAPHORE
-/* #undef UA_GENERATED_NAMESPACE_ZERO */
+#define UA_GENERATED_NAMESPACE_ZERO
 /* #undef UA_GENERATED_NAMESPACE_ZERO_FULL */
 /* #undef UA_ENABLE_PUBSUB_SKS */
 
 /* Options for Debugging */
-/* #undef UA_DEBUG */
+#define UA_DEBUG
 /* #undef UA_DEBUG_DUMP_PKGS */
 /* #undef UA_DEBUG_FILE_LINE_INFO */
 
@@ -519,6 +525,56 @@ UA_LOCK_ASSERT(UA_Lock *lock) {
     UA_assert(lock->count > 0);
 }
 
+#elif defined(UA_ARCHITECTURE_ZEPHYR)
+
+#include <zephyr/kernel.h>
+
+typedef struct {
+    struct k_mutex mutex;
+    k_tid_t owner;
+    unsigned count; /* For recursive locking */
+} UA_Lock;
+
+static UA_INLINE void
+UA_LOCK_INIT(UA_Lock *lock) {
+    k_mutex_init(&lock->mutex);
+    lock->owner = NULL;
+    lock->count = 0;
+}
+
+static UA_INLINE void
+UA_LOCK_DESTROY(UA_Lock *lock) {
+    UA_assert(lock->count == 0);
+    /* Zephyr mutexes don't have destroy */
+}
+
+static UA_INLINE void
+UA_LOCK(UA_Lock *lock) {
+    k_tid_t current = k_current_get();
+    if(lock->owner == current) {
+        lock->count++;
+        return;
+    }
+    k_mutex_lock(&lock->mutex, K_FOREVER);
+    lock->owner = current;
+    lock->count = 1;
+}
+
+static UA_INLINE void
+UA_UNLOCK(UA_Lock *lock) {
+    UA_assert(lock->owner == k_current_get());
+    lock->count--;
+    if(lock->count == 0) {
+        lock->owner = NULL;
+        k_mutex_unlock(&lock->mutex);
+    }
+}
+
+static UA_INLINE void
+UA_LOCK_ASSERT(UA_Lock *lock) {
+    UA_assert(lock->count > 0 && lock->owner == k_current_get());
+}
+
 #endif
 
 /**
@@ -749,7 +805,7 @@ UA_STATIC_ASSERT(sizeof(bool) == 1, cannot_overlay_integers_with_large_bool);
 #endif
 
 
-/**** amalgamated original file "/src_generated/open62541/statuscodes.h" ****/
+/**** amalgamated original file "/build/src_generated/open62541/statuscodes.h" ****/
 
 /** .. _statuscodes:
  *
@@ -1060,7 +1116,7 @@ UA_STATIC_ASSERT(sizeof(bool) == 1, cannot_overlay_integers_with_large_bool);
 #define UA_STATUSCODE_BADDISCOVERYURLMISSING ((UA_StatusCode) 0x80510000)
 
 /* The semaphore file specified by the client is not valid. */
-#define UA_STATUSCODE_BADSEMPAHOREFILEMISSING ((UA_StatusCode) 0x80520000)
+#define UA_STATUSCODE_BADSEMAPHOREFILEMISSING ((UA_StatusCode) 0x80520000)
 
 /* The security token request type is not valid. */
 #define UA_STATUSCODE_BADREQUESTTYPEINVALID ((UA_StatusCode) 0x80530000)
@@ -1530,7 +1586,7 @@ UA_STATIC_ASSERT(sizeof(bool) == 1, cannot_overlay_integers_with_large_bool);
 #endif
 
 
-/**** amalgamated original file "/src_generated/open62541/nodeids.h" ****/
+/**** amalgamated original file "/build/src_generated/open62541/nodeids.h" ****/
 
 /**********************************
  * Autogenerated -- do not modify *
@@ -22062,7 +22118,7 @@ UA_STATIC_ASSERT(sizeof(bool) == 1, cannot_overlay_integers_with_large_bool);
 #define UA_NS0ID_OPTIONSETLENGTH 32750 /* Variable */
 #endif /* UA_NODEIDS_NS0_H_ */ 
 
-/**** amalgamated original file "_repo/include/open62541/common.h" ****/
+/**** amalgamated original file "/include/open62541/common.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -22159,7 +22215,8 @@ UA_AttributeId_name(UA_AttributeId attrId);
  * are ANDed for the overall write mask. Part 3: 5.2.7 Table 2 */
 
 #define UA_WRITEMASK_ACCESSLEVEL             (0x01u << 0u)
-#define UA_WRITEMASK_ARRRAYDIMENSIONS        (0x01u << 1u)
+#define UA_WRITEMASK_ARRAYDIMENSIONS         (0x01u << 1u)
+#define UA_WRITEMASK_ARRRAYDIMENSIONS        UA_WRITEMASK_ARRAYDIMENSIONS /* legacy typo alias */
 #define UA_WRITEMASK_BROWSENAME              (0x01u << 2u)
 #define UA_WRITEMASK_CONTAINSNOLOOPS         (0x01u << 3u)
 #define UA_WRITEMASK_DATATYPE                (0x01u << 4u)
@@ -22512,7 +22569,7 @@ typedef enum {
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/types.h" ****/
+/**** amalgamated original file "/include/open62541/types.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -22693,7 +22750,7 @@ UA_StatusCode_name(UA_StatusCode code);
 UA_EXPORT UA_Boolean
 UA_StatusCode_isBad(UA_StatusCode code);
 
-/* ((code >> 30) == 0x01) && ((code >> 30) < 0x02) */
+/* (code >> 30) == 0x01 */
 UA_EXPORT UA_Boolean
 UA_StatusCode_isUncertain(UA_StatusCode code);
 
@@ -23544,13 +23601,13 @@ struct UA_DataType {
     UA_NodeId typeId;           /* The nodeid of the type */
     UA_NodeId binaryEncodingId; /* NodeId of datatype when encoded as binary */
     UA_NodeId xmlEncodingId;    /* NodeId of datatype when encoded as XML */
-    UA_UInt16 memSize;          /* Size of the struct in memory */
+    UA_UInt32 memSize     : 16; /* Size of the struct in memory */
     UA_UInt32 typeKind    : 6;  /* Dispatch index for the handling routines */
     UA_UInt32 pointerFree : 1;  /* The type (and its members) contains no
                                  * pointers that need to be freed */
     UA_UInt32 overlayable : 1;  /* The type has the identical memory layout
                                  * in memory and on the binary stream. */
-    UA_Byte   membersSize;      /* How many members does the type have? */
+    UA_UInt32 membersSize : 8;  /* How many members does the type have? */
     UA_DataTypeMember *members;
 };
 
@@ -24003,7 +24060,7 @@ UA_Array_delete(void *p, size_t size, const UA_DataType *type);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "/src_generated/open62541/types_generated.h" ****/
+/**** amalgamated original file "/build/src_generated/open62541/types_generated.h" ****/
 
 /**********************************
  * Autogenerated -- do not modify *
@@ -38060,7 +38117,7 @@ typedef struct {
     UA_UInt32 disabledMonitoredItemCount;
     UA_UInt32 monitoringQueueOverflowCount;
     UA_UInt32 nextSequenceNumber;
-    UA_UInt32 eventQueueOverFlowCount;
+    UA_UInt32 eventQueueOverflowCount;
 } UA_SubscriptionDiagnosticsDataType;
 
 #define UA_TYPES_SUBSCRIPTIONDIAGNOSTICSDATATYPE 341
@@ -40159,7 +40216,7 @@ _UA_END_DECLS
 
 
 
-/**** amalgamated original file "_repo/include/open62541/plugin/log.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/log.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -40321,7 +40378,7 @@ UA_LOG_FATAL(const UA_Logger *logger, UA_LogCategory category, const char *msg, 
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/util.h" ****/
+/**** amalgamated original file "/include/open62541/util.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -40861,7 +40918,7 @@ UA_TrustListDataType_getSize(const UA_TrustListDataType *trustList);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/plugin/accesscontrol.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/accesscontrol.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -41005,7 +41062,7 @@ struct UA_AccessControl {
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/plugin/certificategroup.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/certificategroup.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -41137,7 +41194,7 @@ _UA_END_DECLS
 
 #endif /* UA_PLUGIN_CERTIFICATEGROUP_H */
 
-/**** amalgamated original file "_repo/include/open62541/plugin/securitypolicy.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/securitypolicy.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -41601,7 +41658,7 @@ struct UA_PubSubSecurityPolicy {
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/plugin/eventloop.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/eventloop.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -42579,7 +42636,7 @@ UA_ConnectionManager_new_LWIP_UDP(const UA_String eventSourceName);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/plugin/historydatabase.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/historydatabase.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -42591,6 +42648,8 @@ _UA_END_DECLS
 
 
 _UA_BEGIN_DECLS
+
+#ifdef UA_ENABLE_HISTORIZING
 
 typedef struct UA_HistoryDatabase UA_HistoryDatabase;
 
@@ -42773,10 +42832,12 @@ struct UA_HistoryDatabase {
      * For example for read_event, read_annotation, update_details */
 };
 
+#endif /* UA_ENABLE_HISTORIZING */
+
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/client.h" ****/
+/**** amalgamated original file "/include/open62541/client.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -43434,9 +43495,11 @@ struct UA_ClientConfig {
     /* Certificate Verification Plugin */
     UA_CertificateGroup certificateVerification;
 
-    /* Additional SecurityPolicies for authentication (e.g. to encrypt the
-     * password). The SecurityPolicies for SecureChannels (above) are also
-     * usable for authentication. */
+    /* SecurityPolicies for authentication with an x509 certificate. The
+     * UserIdentityToken contains only the certificate. The certificate gets
+     * matched against the SecurityPolicy instance from this array. Only the
+     * SecurityPolicy instance carries the private key. See
+     * UA_ClientConfig_setAuthenticationCert. */
     size_t authSecurityPoliciesSize;
     UA_SecurityPolicy *authSecurityPolicies;
 
@@ -43570,10 +43633,30 @@ UA_ClientConfig_setAuthenticationUsername(UA_ClientConfig *config,
                                           const char *username,
                                           const char *password);
 
+/* This method operates on the client config in two ways:
+ *
+ * - Sets the certificate as a X509IdentityToken for authentication.
+ * - Replaces the authSecurityPolicies array with new instances of the available
+ *   SecurityPolicies using the certificate and associated private-key.
+ *
+ * During session activation, the certificate from the X509IdentityToken gets
+ * matched to a SecurityPolicy for the UserTokenPolicy supported by the server.
+ * The SecurityPolicy (with the private key) is then used for a signature that
+ * proves ownership of the certificate.
+ *
+ * This method is implemented in the /plugins directory as it depends on the
+ * platform-specific crypto implementations. */
+#if defined(UA_ENABLE_ENCRYPTION_OPENSSL) || defined(UA_ENABLE_ENCRYPTION_MBEDTLS)
+UA_StatusCode UA_EXPORT
+UA_ClientConfig_setAuthenticationCert(UA_ClientConfig *config,
+                                      UA_ByteString certificateAuth,
+                                      UA_ByteString privateKeyAuth);
+#endif
+
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/client_highlevel_async.h" ****/
+/**** amalgamated original file "/include/open62541/client_highlevel_async.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -44140,7 +44223,7 @@ UA_Client_addMethodNode_async(
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/client_subscriptions.h" ****/
+/**** amalgamated original file "/include/open62541/client_subscriptions.h" ****/
 
 /* This Source Code Form i subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -44287,7 +44370,12 @@ UA_Client_Subscriptions_setPublishingMode(UA_Client *client,
  *
  * During the creation of a MonitoredItem, the server may return changed
  * adjusted parameters. Check the returned ``UA_CreateMonitoredItemsResponse``
- * to get the current parameters. */
+ * to get the current parameters.
+ *
+ * Be aware that the client may process incoming notifications before receiving
+ * the CreateMonitoredItemsResponse. This is due to the behavior of some server
+ * SDKs. Without this "early processing" we would miss the initial value, which
+ * can be an issue if the value changes at a slow rate. */
 
 /* Provides default values for a new monitored item. */
 static UA_INLINE UA_MonitoredItemCreateRequest
@@ -44305,7 +44393,8 @@ UA_MonitoredItemCreateRequest_default(UA_NodeId nodeId) {
 
 /**
  * The clientHandle parameter cannot be set by the user, any value will be
- * replaced by the client before sending the request to the server. */
+ * replaced by the client with a unique internal ClientHandle value before
+ * sending the request to the server. */
 
 /* Callback for the deletion of a MonitoredItem */
 typedef void (*UA_Client_DeleteMonitoredItemCallback)
@@ -44458,7 +44547,7 @@ UA_Client_MonitoredItem_setContext(UA_Client *client,
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/client_highlevel.h" ****/
+/**** amalgamated original file "/include/open62541/client_highlevel.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -44596,6 +44685,10 @@ UA_EXPORT UA_THREADSAFE UA_StatusCode
 UA_Client_readUserExecutableAttribute(UA_Client *client,
                                       const UA_NodeId nodeId,
                                       UA_Boolean *out);
+
+UA_EXPORT UA_THREADSAFE UA_StatusCode
+UA_Client_readDatatypeDefinitionAttribute(UA_Client* client, const UA_NodeId nodeId,
+                                          UA_StructureDefinition *out);
 
 /**
  * Historical Access
@@ -44914,7 +45007,7 @@ UA_Client_forEachChildNodeCall(
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/include/open62541/server_pubsub.h" ****/
+/**** amalgamated original file "/include/open62541/server_pubsub.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -46039,7 +46132,7 @@ _UA_END_DECLS
 
 #endif /* UA_SERVER_PUBSUB_H */
 
-/**** amalgamated original file "_repo/include/open62541/server.h" ****/
+/**** amalgamated original file "/include/open62541/server.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -46056,7 +46149,6 @@ _UA_END_DECLS
  *    Copyright 2017-2020 (c) HMS Industrial Networks AB (Author: Jonas Green)
  *    Copyright 2020-2022 (c) Christian von Arnim, ISW University of Stuttgart  (for VDW and umati)
  *    Copyright 2025 (c) o6 Automation GmbH (Author: Julius Pfrommer)
- *    Copyright 2025-2026 (c) o6 Automation GmbH (Author: Andreas Ebner)
  */
 
 
@@ -47553,7 +47645,7 @@ UA_Server_cancelAsync(UA_Server *server, void *asyncOpContext,
  *    "path-string", a :ref:``human-readable encoding of a
  *    SimpleAttributeOperand<parse-sao>`. For example ``/SourceNode`` or
  *    ``/EventType``.
- * 2. An NodeId pointing to an ObjectNode that instantiates an EventType. The
+ * 2. A NodeId pointing to an ObjectNode that instantiates an EventType. The
  *    ``SimpleAttributeOperands`` from the EventFilter are resolved in its
  *    context.
  * 3. The event fields defined as mandatory for the *BaseEventType* have a
@@ -47588,6 +47680,15 @@ UA_Server_cancelAsync(UA_Server *server, void *asyncOpContext,
  *    /Severity
  *       UInt16 for the urgency of the event defined to be between 1 (lowest) and
  *       1000 (catastrophic) (default: argument of ``_createEvent``)
+ *
+ * The "path-string" (SimpleAttributeOperand expression) can use
+ * namespace-indices and point into nested objects and variables. For example
+ * ``/1:Truck/2:Wheel``.
+ *
+ * The key-value map source for the event-fields uses a QualifiedName for the
+ * key. The NamespaceIndex from the key is used as the default NamespaceIndex
+ * for the path elements that do not define it explicitly. So the key
+ * ``2:"/1:Truck/Wheel"`` becomes ``/1:Truck/2:Wheel``.
  *
  * An event field that is missing from all sources resolves to an empty variant.
  *
@@ -48476,92 +48577,6 @@ UA_Server_removeCertificates(UA_Server *server,
                              size_t certificatesSize,
                              const UA_Boolean isTrusted);
 
-/**
- * Role-Based Access Control (RBAC)
- * =================================
- *
- * Role-Based Access Control implementation per OPC UA Part 18.
- *
- * **WARNING**: This feature is EXPERIMENTAL and NOT FOR PRODUCTION USE.
- * The RBAC implementation is under active development and the API may change.
- * Use only for testing and development purposes.
- *
- * RBAC allows fine-grained access control by assigning roles to sessions and
- * defining permissions per role on individual nodes or entire namespaces.
- */
-
-#ifdef UA_ENABLE_RBAC
-
-/**
- * UA_RolePermissionEntry
- * ----------------------
- * Maps a role to its permissions. Used in both node-level and namespace-level
- * permission configurations. */
-typedef struct {
-    UA_NodeId roleId;
-    UA_UInt32 permissions;      /* Bitmask of UA_PermissionType values */
-} UA_RolePermissionEntry;
-
-/**
- * UA_RolePermissions
- * ------------------
- * Container for role permission entries with reference counting.
- * Multiple nodes can share the same RolePermissions configuration
- * through the refCount mechanism. */
-typedef struct {
-    size_t entriesSize;
-    UA_RolePermissionEntry *entries;
-    size_t refCount;            /* Number of nodes referencing this configuration */
-} UA_RolePermissions;
-
-/* UA_RolePermissions Type Management */
-void UA_EXPORT
-UA_RolePermissions_init(UA_RolePermissions *rp);
-
-void UA_EXPORT
-UA_RolePermissions_clear(UA_RolePermissions *rp);
-
-UA_StatusCode UA_EXPORT
-UA_RolePermissions_copy(const UA_RolePermissions *src, UA_RolePermissions *dst);
-
-/**
- * UA_Role
- * -------
- * Represents an OPC UA role with identity mapping rules and optional
- * application/endpoint restrictions per OPC UA Part 18. */
-typedef struct {
-    UA_NodeId roleId;
-    UA_QualifiedName roleName;              /* BrowseName of the role */
-    
-    /* Identity Mapping Rules - determine which sessions get this role */
-    size_t identityMappingRulesSize;
-    UA_IdentityMappingRuleType *identityMappingRules;
-    
-    /* Application restrictions  (empty list = ignore) */
-    UA_Boolean applicationsExclude;
-    size_t applicationsSize;
-    UA_String *applications;
-    
-    /* Endpoint restrictions (empty list = ignore) */
-    UA_Boolean endpointsExclude;
-    size_t endpointsSize;
-    UA_EndpointType *endpoints;
-} UA_Role;
-
-/* UA_Role Type Management */
-void UA_EXPORT
-UA_Role_init(UA_Role *role);
-
-void UA_EXPORT
-UA_Role_clear(UA_Role *role);
-
-UA_StatusCode UA_EXPORT
-UA_Role_copy(const UA_Role *src, UA_Role *dst);
-
-UA_Boolean UA_EXPORT
-UA_Role_equal(const UA_Role *r1, const UA_Role *r2);
-
-#endif /* UA_ENABLE_RBAC */
 
 _UA_END_DECLS
 
@@ -48569,7 +48584,7 @@ _UA_END_DECLS
 #endif
 
 
-/**** amalgamated original file "_repo/include/open62541/pubsub.h" ****/
+/**** amalgamated original file "/include/open62541/pubsub.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -48857,7 +48872,7 @@ _UA_END_DECLS
 
 #endif /* UA_PUBSUB_H */
 
-/**** amalgamated original file "_repo/include/open62541/plugin/nodestore.h" ****/
+/**** amalgamated original file "/include/open62541/plugin/nodestore.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -49462,7 +49477,7 @@ UA_Node_clear(UA_Node *node);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/accesscontrol_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/accesscontrol_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -49512,7 +49527,7 @@ UA_AccessControl_defaultWithLoginCallback(UA_ServerConfig *config,
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/certificategroup_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/certificategroup_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -49611,7 +49626,7 @@ UA_CertificateGroup_Filestore(UA_CertificateGroup *certGroup,
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/log_stdout.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/log_stdout.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -49637,7 +49652,7 @@ UA_Log_Stdout_new(UA_LogLevel minlevel);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/nodestore_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/nodestore_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -49660,7 +49675,7 @@ UA_EXPORT UA_Nodestore * UA_Nodestore_ZipTree(void);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/server_config_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/server_config_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -49987,7 +50002,7 @@ UA_ServerConfig_addAllSecureEndpoints(UA_ServerConfig *config);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/client_config_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/client_config_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -50004,26 +50019,21 @@ _UA_BEGIN_DECLS
 UA_StatusCode UA_EXPORT
 UA_ClientConfig_setDefault(UA_ClientConfig *config);
 
-/* If certificates are used for authentication, this is only possible when
- * openssl or mbedtls is used. Libressl is currently not supported.*/
-#if defined(UA_ENABLE_ENCRYPTION_OPENSSL) || defined(UA_ENABLE_ENCRYPTION_MBEDTLS)
-UA_StatusCode UA_EXPORT
-UA_ClientConfig_setAuthenticationCert(UA_ClientConfig *config,
-                                      UA_ByteString certificateAuth, UA_ByteString privateKeyAuth);
-#endif
-
 #ifdef UA_ENABLE_ENCRYPTION
 UA_StatusCode UA_EXPORT
 UA_ClientConfig_setDefaultEncryption(UA_ClientConfig *config,
-                                     UA_ByteString localCertificate, UA_ByteString privateKey,
-                                     const UA_ByteString *trustList, size_t trustListSize,
-                                     const UA_ByteString *revocationList, size_t revocationListSize);
+                                     UA_ByteString localCertificate,
+                                     UA_ByteString privateKey,
+                                     const UA_ByteString *trustList,
+                                     size_t trustListSize,
+                                     const UA_ByteString *revocationList,
+                                     size_t revocationListSize);
 #endif
 
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/securitypolicy_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/securitypolicy_default.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -50112,7 +50122,7 @@ UA_PubSubSecurityPolicy_Aes256CtrTPM(UA_PubSubSecurityPolicy *policy, char *user
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/create_certificate.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/create_certificate.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50157,7 +50167,7 @@ UA_CreateCertificate(const UA_Logger *logger, const UA_String *subject,
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/server_config_file_based.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/server_config_file_based.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.
@@ -50192,7 +50202,7 @@ _UA_END_DECLS
 
 #endif //UA_SERVER_CONFIG_FILE_BASED_H
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/historydata/history_data_backend.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/historydata/history_data_backend.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50482,7 +50492,7 @@ struct UA_HistoryDataBackend {
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/historydata/history_data_gathering.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/historydata/history_data_gathering.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50601,7 +50611,7 @@ struct UA_HistoryDataGathering {
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/historydata/history_database_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/historydata/history_database_default.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50621,7 +50631,7 @@ UA_HistoryDatabase_default(UA_HistoryDataGathering gathering);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/historydata/history_data_gathering_default.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/historydata/history_data_gathering_default.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50659,7 +50669,7 @@ void gathering_default_pauseRecording(UA_HistoryDataGathering *gathering, const 
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/historydata/history_data_backend_memory.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/historydata/history_data_backend_memory.h" ****/
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50693,7 +50703,7 @@ UA_HistoryDataBackend_Memory_clear(UA_HistoryDataBackend *backend);
 _UA_END_DECLS
 
 
-/**** amalgamated original file "_repo/plugins/include/open62541/plugin/log_syslog.h" ****/
+/**** amalgamated original file "/plugins/include/open62541/plugin/log_syslog.h" ****/
 
 /* This work is licensed under a Creative Commons CCZero 1.0 Universal License.
  * See http://creativecommons.org/publicdomain/zero/1.0/ for more information.

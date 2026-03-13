@@ -1,9 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
-#include <open62541/server.h>
-
-#include <open62541/server.h>
+#include "open62541.h"
 
 int main(int argc, char** argv)
 {

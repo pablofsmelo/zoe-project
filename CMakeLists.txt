@@ -10,7 +10,7 @@ target_sources(app PRIVATE src/main.c src/open62541.c)
 target_include_directories(app PRIVATE src)
 
 # Optimize for code size to fit in ESP32
-add_compile_options(-Os -fno-asynchronous-unwind-tables -fno-unwind-tables -ffunction-sections -fdata-sections)
+add_compile_options(-Os -fno-asynchronous-unwind-tables -fno-unwind-tables -ffunction-sections -fdata-sections -mlongcalls)
 
 # Linker relaxation and garbage collection for Xtensa call8 relocations
-target_link_options(app PRIVATE LINKER:--relax LINKER:--gc-sections)
+target_link_options(app PRIVATE LINKER:--relax LINKER:--gc-sections LINKER:-mlongcalls)
