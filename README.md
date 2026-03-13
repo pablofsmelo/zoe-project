@@ -1,58 +1,82 @@
 # ZOE Project
 
-> Zephyr-based OPC UA Server running on ESP32 using open62541
+> Zephyr-based OPC UA server on Espressif (ESP32-C3 recommended) using open62541
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 🧠 About the Project
+## About the Project
 
-**ZOE (Zephyr OPC UA ESP32)** is an open-source initiative that demonstrates how to run an **OPC UA server** on **ESP32** using the [**open62541**](https://github.com/open62541/open62541) stack and **Zephyr RTOS**.
+**ZOE (Zephyr OPC UA Espressif)** is an open-source project that runs an **OPC UA server** on **Espressif** boards using the [**open62541**](https://github.com/open62541/open62541) stack and **Zephyr RTOS**.
 
-The project provides a working reference for implementing **industrial-grade communication protocols** in embedded devices. It is ideal for developers working with IoT, IIoT, automation systems, and standardized data exchange over OPC UA.
+Supported target: **ESP32-C3** (RISC-V). The classic ESP32 (Xtensa) is not supported for this application due to linker range limitations; see `LIMITATIONS.md` and `docs/OPC_UA_ESPESSIF_MINIMO.md` for details and alternatives.
 
----
-
-## 📦 Zephyr Installation (Required)
-
-Before building the ZOE Project, you need to install and configure **Zephyr RTOS** with ESP32 support.
-
-Follow the official Zephyr documentation for ESP32 setup:
-👉 [https://docs.zephyrproject.org/latest/boards/xtensa/esp32/doc/index.html](https://docs.zephyrproject.org/latest/boards/xtensa/esp32/doc/index.html)
-
-Make sure to:
-- Install the **Zephyr SDK**
-- Install **West** (Zephyr's meta-tool)
-- Initialize and update Zephyr's repositories
-- Export the environment with `zephyr-env.sh` or equivalent
-
-Once Zephyr is working correctly with ESP32, proceed with the steps below.
+The project is a reference for **industrial communication (OPC UA)** on embedded devices with Zephyr, suitable for IoT, IIoT, and automation.
 
 ---
 
-## 🚀 Getting Started
+## Zephyr Setup (Required)
 
-### ✅ Prerequisites
+Install and configure **Zephyr RTOS** with Espressif support before building.
 
-- Zephyr SDK and West installed and configured for ESP32
-- ESP-IDF setup (if needed for low-level ESP32 features)
-- Git with submodule support
-- Python 3, CMake, Ninja build system
-- Supported board (e.g., `esp32s3_devkitc`)
+- Install the **Zephyr SDK** and **West**.
+- Initialize and update the Zephyr workspace and export the environment (e.g. `source zephyr-env.sh`).
+- Ensure **ESP-IDF** is installed and its path is set (e.g. `export ESP_IDF_PATH=$HOME/esp/esp-idf`).
 
-### 🔧 Setup Instructions
+For board-specific details, see the [Zephyr Espressif documentation](https://docs.zephyrproject.org/latest/boards/riscv/esp32c3_devkitc/doc/index.html).
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Zephyr SDK and West installed and configured
+- **ESP-IDF** (path set in `ESP_IDF_PATH`)
+- **ZEPHYR_BASE** set (e.g. after sourcing `zephyr-env.sh`)
+- Hal Espressif module (e.g. `modules/hal/espressif` in the workspace containing Zephyr)
+- Python 3, CMake, Ninja
+- Supported board: **esp32c3_devkitc** (default); others such as `weact_esp32c3_mini`, `xiao_esp32c3`, `esp32c3_devkitm` can be tried
+
+### Setup
 
 ```bash
-# Clone the repository with submodules
+# Clone with submodules
 git clone --recurse-submodules https://github.com/your-username/zoe-project.git
 cd zoe-project
 
-# Run the install script to set up open62541
+# Install open62541 (if applicable)
 ./install_open62541.sh
+```
 
-# Build the project for your ESP32 board
-west build -b esp32 -- -DDTC_OVERLAY_FILE=boards/esp32.overlay
+### Build
 
-# Flash the binary to the ESP32 board
-west flash
+From the project root, with `ZEPHYR_BASE` and `ESP_IDF_PATH` set:
+
+```bash
+./build.sh
+```
+
+Default board is **esp32c3_devkitc**. To use another board:
+
+```bash
+BOARD=weact_esp32c3_mini ./build.sh
+```
+
+Optional: set `HAL_ESPRESSIF` if the hal is not at `../modules/hal/espressif` relative to the project.
+
+### Flash
+
+The build produces **`build/zephyr/zephyr.elf`**. Use it for flashing, for example:
+
+- From the Zephyr workspace: `west flash`
+- Or with **esptool**: `esptool.py --chip esp32c3 ...` (see Zephyr/ESP-IDF docs)
+
+If Ninja reports an error only in the final step (e.g. objcopy), the **`.elf`** is still valid and can be used for flashing.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

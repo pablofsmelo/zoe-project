@@ -1,9 +1,9 @@
 / {
     aliases {
-        led0 = &led0_node;
+        led0 = &blue_led;
     };
 };
 
-&led0_node {
-    gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>; 
+&blue_led {
+    gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
 };
